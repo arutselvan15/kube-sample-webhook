@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/http"
 
 	"k8s.io/client-go/rest"
@@ -23,8 +24,8 @@ func main() {
 	)
 
 	flag.StringVar(&port, "port", "8000", "Webhook server port.")
-	flag.StringVar(&certFile, "tlsCertFile", "/etc/webhook/certs/estore-product-kube-webhook.crt", "File containing the x509 Certificate for HTTPS.")
-	flag.StringVar(&keyFile, "tlsKeyFile", "/etc/webhook/certs/estore-product-kube-webhook.key", "File containing the x509 private key to --tlsCertFile.")
+	flag.StringVar(&certFile, "tlsCertFile", "/etc/webhook/certs/tls.crt", "File containing the x509 Certificate for HTTPS.")
+	flag.StringVar(&keyFile, "tlsKeyFile", "/etc/webhook/certs/tls.key", "File containing the x509 private key to --tlsCertFile.")
 	flag.Parse()
 
 	log := gLog.GetLogger()
@@ -62,7 +63,7 @@ func main() {
 	server := &http.Server{
 		// We listen on port 8443 such that we do not need root privileges or extra capabilities for this server.
 		// The Service object will take care of mapping this port to the HTTPS port 443.
-		Addr:    port,
+		Addr:    fmt.Sprintf(":%v", port),
 		Handler: mux,
 	}
 	log.Fatal(server.ListenAndServeTLS(certFile, keyFile))

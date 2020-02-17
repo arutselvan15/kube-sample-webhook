@@ -1,4 +1,4 @@
-GO=${GO_CROSS_CMPL} GO111MODULE=on go
+GO=GO111MODULE=on go
 # for mac GO_CROSS_CMPL=GOOS=darwin GOARCH=amd64
 # for linux GO_CROSS_CMPL=GOOS=linux GOARCH=amd64
 
@@ -50,7 +50,7 @@ gen-version:
 
 build: test gen-version
 	@echo "==> Build Local..."
-	CGO_ENABLED=0 ${GO} build -o ${BINARY} ${MAIN_GO}
+	${GO_CROSS_CMPL} CGO_ENABLED=0 ${GO} build -o ${BINARY} ${MAIN_GO}
 
 container: build
 	docker build -t ${NAME} .
