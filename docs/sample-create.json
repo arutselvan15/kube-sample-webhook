@@ -1,0 +1,70 @@
+{
+  "apiVersion": "admission.k8s.io/v1beta1",
+  "kind": "AdmissionReview",
+  "request": {
+    "uid": "77488c18-9a28-4434-8b0f-4a1550d5ff58",
+    "kind": {
+      "group": "estore.com",
+      "version": "v1",
+      "kind": "Product"
+    },
+    "resource": {
+      "group": "estore.com",
+      "version": "v1",
+      "resource": "products"
+    },
+    "requestKind": {
+      "group": "estore.com",
+      "version": "v1",
+      "kind": "Product"
+    },
+    "requestResource": {
+      "group": "estore.com",
+      "version": "v1",
+      "resource": "products"
+    },
+    "name": "examples-product-1",
+    "namespace": "estore-infra",
+    "operation": "CREATE",
+    "userInfo": {
+      "username": "system:serviceaccount:kubernetes-dashboard:kubernetes-dashboard",
+      "uid": "950eb350-be50-4b60-a59f-92a75976ab22",
+      "groups": [
+        "system:serviceaccounts",
+        "system:serviceaccounts:kubernetes-dashboard",
+        "system:authenticated"
+      ]
+    },
+    "object": {
+      "apiVersion": "estore.com/v1",
+      "kind": "Product",
+      "metadata": {
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"estore.com/v1\",\"kind\":\"Product\",\"metadata\":{\"annotations\":{},\"name\":\"examples-product-1\",\"namespace\":\"estore-infra\"},\"spec\":{\"brand\":\"examples-brand\",\"categories\":[\"cellphones\"],\"description\":\"examples description\",\"displayName\":\"SampleProduct1\",\"price\":100}}\n"
+        },
+        "creationTimestamp": "2020-02-17T23:32:14Z",
+        "generation": 1,
+        "name": "examples-product-1",
+        "namespace": "estore-infra",
+        "resourceVersion": "277572",
+        "uid": "e16fd6ef-5546-45ca-b693-681c35bd33c9"
+      },
+      "spec": {
+        "brand": "examples-brand",
+        "categories": [
+          "cellphones"
+        ],
+        "description": "examples description",
+        "displayName": "SampleProduct1",
+        "price": 100
+      }
+    },
+    "oldObject": null,
+    "dryRun": false,
+    "options": {
+      "kind": "CreateOptions",
+      "apiVersion": "meta.k8s.io/v1",
+      "propagationPolicy": "Foreground"
+    }
+  }
+}

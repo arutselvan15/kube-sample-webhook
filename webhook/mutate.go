@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	cv "github.com/arutselvan15/estore-common/validate"
@@ -11,13 +12,17 @@ import (
 )
 
 // MutateProduct mutate product
-func MutateProduct(operation string, pdt pdtv1.Product) ([]byte, error) {
+func MutateProduct(pdt pdtv1.Product, operation, user string) ([]byte, error) {
 	var (
 		addAnnotations       = map[string]string{}
 		addLabels            = map[string]string{}
 		availableAnnotations = pdt.GetAnnotations()
 		availableLabels      = pdt.GetLabels()
 	)
+
+	if user == "" {
+		return nil, fmt.Errorf("user not found in request")
+	}
 
 	if availableAnnotations == nil {
 		availableAnnotations = map[string]string{}

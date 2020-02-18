@@ -70,9 +70,9 @@ func (s Server) Serve(rWriter http.ResponseWriter, req *http.Request) {
 		log.LogAuditObject(pdt)
 
 		if req.URL.Path == cfg.MutateURL {
-			admissionResponse = s.mutate(string(arRequest.Operation), pdt)
+			admissionResponse = s.mutate(pdt, string(arRequest.Operation), arRequest.UserInfo.Username)
 		} else if req.URL.Path == cfg.ValidateURL {
-			admissionResponse = s.validate(string(arRequest.Operation), pdt)
+			admissionResponse = s.validate(pdt, string(arRequest.Operation), arRequest.UserInfo.Username)
 		}
 	}
 
@@ -102,7 +102,7 @@ func (s Server) Serve(rWriter http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (s Server) mutate(operation string, pdt pdtv1.Product) *v1beta1.AdmissionResponse {
+func (s Server) mutate(pdt pdtv1.Product, operation, user string) *v1beta1.AdmissionResponse {
 	log.SetStep(lc.Mutate).SetStepState(lc.Start).Infof("mutate namespace=%s, name=%s", pdt.Namespace, pdt.Name)
 
 	response := &v1beta1.AdmissionResponse{
@@ -117,7 +117,7 @@ func (s Server) mutate(operation string, pdt pdtv1.Product) *v1beta1.AdmissionRe
 
 		response.Allowed = true
 	} else {
-		patchBytes, err := MutateProduct(operation, pdt)
+		patchBytes, err := MutateProduct(pdt, operation, user)
 
 		if err != nil {
 			log.SetStepState(lc.Error).Error(err.Error())
@@ -143,7 +143,7 @@ func (s Server) mutate(operation string, pdt pdtv1.Product) *v1beta1.AdmissionRe
 	return response
 }
 
-func (s Server) validate(operation string, pdt pdtv1.Product) *v1beta1.AdmissionResponse {
+func (s Server) validate(pdt pdtv1.Product, operation, user string) *v1beta1.AdmissionResponse {
 	log.SetStep(lc.Validate).SetStepState(lc.Start).Infof("validate namespace=%s, name=%s", pdt.Namespace, pdt.Name)
 
 	response := &v1beta1.AdmissionResponse{
@@ -158,7 +158,7 @@ func (s Server) validate(operation string, pdt pdtv1.Product) *v1beta1.Admission
 
 		response.Allowed = true
 	} else {
-		err := validateProduct(operation, pdt)
+		err := validateProduct(pdt, operation, user)
 
 		if err != nil {
 			log.SetStepState(lc.Error).Error(err.Error())

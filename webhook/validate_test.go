@@ -65,6 +65,7 @@ func Test_validateName(t *testing.T) {
 func Test_validateProduct(t *testing.T) {
 	type args struct {
 		operation string
+		user      string
 		pdt       v1.Product
 	}
 
@@ -84,15 +85,17 @@ func Test_validateProduct(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "success valid pdt", args: args{operation: cfg.Create, pdt: pdtOk}, wantErr: false,
+			name: "success valid pdt", args: args{operation: cfg.Create, pdt: pdtOk, user: "system"}, wantErr: false,
 		}, {
-			name: "failure invalid pdt", args: args{operation: cfg.Update, pdt: pdtErr}, wantErr: true,
+			name: "failure invalid pdt", args: args{operation: cfg.Update, pdt: pdtErr, user: "system"}, wantErr: true,
+		}, {
+			name: "failure user empty", args: args{operation: cfg.Update, pdt: pdtErr, user: ""}, wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateProduct(tt.args.operation, tt.args.pdt); (err != nil) != tt.wantErr {
+			if err := validateProduct(tt.args.pdt, tt.args.operation, tt.args.user); (err != nil) != tt.wantErr {
 				t.Errorf("validateProduct() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

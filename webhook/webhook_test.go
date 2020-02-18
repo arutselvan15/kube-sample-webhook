@@ -170,6 +170,7 @@ func TestServer_validate(t *testing.T) {
 
 	type args struct {
 		operation string
+		user      string
 		pdt       pdtv1.Product
 	}
 
@@ -185,13 +186,13 @@ func TestServer_validate(t *testing.T) {
 		want   bool
 	}{
 		{
-			name: "success validate pdt", fields: fields{Clients: fClient}, args: args{operation: cfg.Create, pdt: *pdt}, want: true,
+			name: "success validate pdt", fields: fields{Clients: fClient}, args: args{operation: cfg.Create, pdt: *pdt, user: "system"}, want: true,
 		},
 		{
-			name: "failure validate pdt invalid name", fields: fields{Clients: fClient}, args: args{operation: cfg.Update, pdt: *invalidName}, want: false,
+			name: "failure validate pdt invalid name", fields: fields{Clients: fClient}, args: args{operation: cfg.Update, pdt: *invalidName, user: "system"}, want: false,
 		},
 		{
-			name: "failure validate pdt invalid brand", fields: fields{Clients: fClient}, args: args{operation: cfg.Create, pdt: *invalidBrand}, want: false,
+			name: "failure validate pdt invalid brand", fields: fields{Clients: fClient}, args: args{operation: cfg.Create, pdt: *invalidBrand, user: "system"}, want: false,
 		},
 	}
 
@@ -200,7 +201,7 @@ func TestServer_validate(t *testing.T) {
 			s := Server{
 				Clients: tt.fields.Clients,
 			}
-			if got := s.validate(tt.args.operation, tt.args.pdt); !got.Allowed == tt.want {
+			if got := s.validate(tt.args.pdt, tt.args.operation, tt.args.user); !got.Allowed == tt.want {
 				t.Errorf("validate() = %v, want %v", got.Allowed, tt.want)
 			}
 		})
@@ -214,6 +215,7 @@ func TestServer_mutate(t *testing.T) {
 
 	type args struct {
 		operation string
+		user      string
 		pdt       pdtv1.Product
 	}
 
@@ -229,13 +231,13 @@ func TestServer_mutate(t *testing.T) {
 		want   bool
 	}{
 		{
-			name: "success mutate pdt", fields: fields{Clients: fClient}, args: args{operation: cfg.Create, pdt: *pdt}, want: true,
+			name: "success mutate pdt", fields: fields{Clients: fClient}, args: args{operation: cfg.Create, pdt: *pdt, user: "system"}, want: true,
 		},
 		{
-			name: "success already mutate pdt", fields: fields{Clients: fClient}, args: args{operation: cfg.Update, pdt: *alreadyMutatedPdt}, want: true,
+			name: "success already mutate pdt", fields: fields{Clients: fClient}, args: args{operation: cfg.Update, pdt: *alreadyMutatedPdt, user: "system"}, want: true,
 		},
 		{
-			name: "success no mutate on delete", fields: fields{Clients: fClient}, args: args{operation: cfg.Delete, pdt: *pdt}, want: true,
+			name: "success no mutate on delete", fields: fields{Clients: fClient}, args: args{operation: cfg.Delete, pdt: *pdt, user: "system"}, want: true,
 		},
 	}
 	for _, tt := range tests {
@@ -243,7 +245,7 @@ func TestServer_mutate(t *testing.T) {
 			s := Server{
 				Clients: tt.fields.Clients,
 			}
-			if got := s.mutate(tt.args.operation, tt.args.pdt); !got.Allowed == tt.want {
+			if got := s.mutate(tt.args.pdt, tt.args.operation, tt.args.user); !got.Allowed == tt.want {
 				t.Errorf("mutate() = %v, want %v", got.Allowed, tt.want)
 			}
 		})

@@ -11,6 +11,7 @@ import (
 func TestMutateProduct(t *testing.T) {
 	type args struct {
 		operation string
+		user      string
 		pdt       pdtv1.Product
 	}
 
@@ -25,19 +26,22 @@ func TestMutateProduct(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "success mutate pdt", args: args{operation: cfg.Create, pdt: *pdt}, want: true,
+			name: "success mutate pdt", args: args{operation: cfg.Create, pdt: *pdt, user: "system"}, want: true,
 		},
 		{
-			name: "success no mutate pdt on delete", args: args{operation: cfg.Delete, pdt: *pdt}, want: false,
+			name: "failure mutate pdt no user", args: args{operation: cfg.Create, pdt: *pdt, user: ""}, want: false, wantErr: true,
 		},
 		{
-			name: "success no mutate pdt already mutation done", args: args{operation: cfg.Update, pdt: *alreadyMutatedPdt}, want: false,
+			name: "success no mutate pdt on delete", args: args{operation: cfg.Delete, pdt: *pdt, user: "system"}, want: false,
+		},
+		{
+			name: "success no mutate pdt already mutation done", args: args{operation: cfg.Update, pdt: *alreadyMutatedPdt, user: "system"}, want: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := MutateProduct(tt.args.operation, tt.args.pdt)
+			got, err := MutateProduct(tt.args.pdt, tt.args.operation, tt.args.user)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MutateProduct() error = %v, wantErr %v", err, tt.wantErr)
 				return

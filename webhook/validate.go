@@ -11,8 +11,12 @@ import (
 	cfg "github.com/arutselvan15/estore-product-kube-webhook/config"
 )
 
-func validateProduct(operation string, pdt pdtv1.Product) error {
+func validateProduct(pdt pdtv1.Product, operation, user string) error {
 	var errors []string
+
+	if user == "" {
+		errors = append(errors, "user not found in request")
+	}
 
 	switch strings.ToLower(operation) {
 	case strings.ToLower(cfg.Create), strings.ToLower(cfg.Update):
