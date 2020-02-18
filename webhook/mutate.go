@@ -20,16 +20,16 @@ func MutateProduct(pdt pdtv1.Product, operation, user string) ([]byte, error) {
 		availableLabels      = pdt.GetLabels()
 	)
 
-	if user == "" {
-		return nil, fmt.Errorf("user not found in request")
-	}
-
 	if availableAnnotations == nil {
 		availableAnnotations = map[string]string{}
 	}
 
 	if availableLabels == nil {
 		availableLabels = map[string]string{}
+	}
+
+	if user == "" {
+		return nil, fmt.Errorf("user not found in request")
 	}
 
 	if strings.EqualFold(operation, cfg.Delete) {

@@ -12,7 +12,6 @@ import (
 	gc "github.com/arutselvan15/estore-common/config"
 
 	cfg "github.com/arutselvan15/estore-product-kube-webhook/config"
-	gLog "github.com/arutselvan15/estore-product-kube-webhook/log"
 	"github.com/arutselvan15/estore-product-kube-webhook/webhook"
 )
 
@@ -28,26 +27,24 @@ func main() {
 	flag.StringVar(&keyFile, "tlsKeyFile", "/etc/webhook/certs/tls.key", "File containing the x509 private key to --tlsCertFile.")
 	flag.Parse()
 
-	log := gLog.GetLogger()
-
 	// kube config defined in env
-	if gc.KubeConfigPath != "" {
-		config, err = clientcmd.BuildConfigFromFlags("", gc.KubeConfigPath)
+	if gc.GetKubeConfigPath() != "" {
+		config, err = clientcmd.BuildConfigFromFlags("", gc.GetKubeConfigPath())
 		if err != nil {
-			log.Fatalf("error creating config using kube config path: %v", err)
+			panic(fmt.Sprintf("error creating config using kube config path: %v", err.Error()))
 		}
 	} else {
 		// default get current cluster config
 		config, err = rest.InClusterConfig()
 		if err != nil {
-			log.Fatalf("error creating config using cluster config: %v", err)
+			panic(fmt.Sprintf("error creating config using cluster config: %v", err))
 		}
 	}
 
 	// create client for config
 	estoreClients, err := cc.NewEstoreClientForConfig(config)
 	if err != nil {
-		log.Fatalf("error creating clients: %v", err)
+		panic(fmt.Sprintf("error creating clients: %v", err))
 	}
 
 	// web hook server
@@ -66,5 +63,9 @@ func main() {
 		Addr:    fmt.Sprintf(":%v", port),
 		Handler: mux,
 	}
-	log.Fatal(server.ListenAndServeTLS(certFile, keyFile))
+	err = server.ListenAndServeTLS(certFile, keyFile)
+
+	if err != nil {
+		panic(fmt.Sprintf("error unable to seart the server: %v", err))
+	}
 }

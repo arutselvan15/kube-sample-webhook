@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 
 	cc "github.com/arutselvan15/estore-common/clients"
-	ccfg "github.com/arutselvan15/estore-common/config"
 	cv "github.com/arutselvan15/estore-common/validate"
 	pdtv1 "github.com/arutselvan15/estore-product-kube-client/pkg/apis/estore/v1"
 	lc "github.com/arutselvan15/go-utils/logconstants"
@@ -25,9 +24,6 @@ import (
 )
 
 var (
-	pdt               pdtv1.Product
-	admissionResponse *v1beta1.AdmissionResponse
-
 	log           = cLog.GetLogger()
 	runtimeScheme = runtime.NewScheme()
 	codecs        = serializer.NewCodecFactory(runtimeScheme)
@@ -40,59 +36,52 @@ type Server struct {
 }
 
 // Serve serve
-func (s Server) Serve(rWriter http.ResponseWriter, req *http.Request) {
-	admissionReviewReceived, err := decodeAdmissionReview(req.Body)
+func (s Server) Serve(httpWriter http.ResponseWriter, httpReq *http.Request) {
+	var (
+		admissionReviewResponse = v1beta1.AdmissionReview{}
+		admissionResponse       = &v1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &metav1.Status{},
+		}
+	)
 
+	admissionReviewRequest, err := decodeAdmissionReview(httpReq.Body)
 	if err != nil {
-		log.Errorf(err.Error())
-		http.Error(rWriter, "empty body", http.StatusBadRequest)
+		handleError(httpWriter, fmt.Errorf("empty body.  %s", err.Error()), http.StatusBadRequest)
 
 		return
 	}
 
-	arRequest := admissionReviewReceived.Request
+	req := admissionReviewRequest.Request
 
-	// during delete the object will be empty but you will have old object
-	objBytes := arRequest.Object.Raw
-	if strings.EqualFold(string(arRequest.Operation), cfg.Delete) {
-		objBytes = arRequest.OldObject.Raw
-	}
-
-	if err = json.Unmarshal(objBytes, &pdt); err != nil {
-		log.SetStepState(lc.Error).Errorf("can't unmarshal product object: %s", err.Error())
-
-		admissionResponse = &v1beta1.AdmissionResponse{Result: &metav1.Status{Message: err.Error()}}
+	if req != nil {
+		if cv.CheckBlacklistUser(req.UserInfo.Username) {
+			admissionResponse.Result.Message = fmt.Sprintf("user %s is black listed", req.UserInfo.Username)
+		} else if cv.CheckBlacklistNamespace(req.Namespace) {
+			admissionResponse.Result.Message = fmt.Sprintf("namedpace %s is black listed", req.Namespace)
+		} else if cv.CheckSystemUser(req.UserInfo.Username) || cv.CheckSystemNamespace(req.Namespace) {
+			admissionResponse.Allowed = true
+		} else {
+			admissionResponse = s.handle(httpReq.URL.String(), req)
+		}
 	} else {
-		log.SetObjectName(arRequest.Name).SetOperation(strings.ToLower(string(arRequest.Operation))).SetUser(
-			arRequest.UserInfo.Username).Infof("admission review for namespace=%s, name=%s, user=%s, operation=%s",
-			arRequest.Namespace, arRequest.Name, arRequest.UserInfo.Username, arRequest.Operation)
-
-		log.LogAuditObject(pdt)
-
-		if req.URL.Path == cfg.MutateURL {
-			admissionResponse = s.mutate(pdt, string(arRequest.Operation), arRequest.UserInfo.Username)
-		} else if req.URL.Path == cfg.ValidateURL {
-			admissionResponse = s.validate(pdt, string(arRequest.Operation), arRequest.UserInfo.Username)
-		}
+		admissionResponse.Result.Message = fmt.Sprintf("request is empty")
 	}
 
-	admissionReviewOut := v1beta1.AdmissionReview{}
 	if admissionResponse != nil {
-		admissionReviewOut.Response = admissionResponse
-		if admissionReviewReceived != nil && admissionReviewReceived.Request != nil {
-			admissionReviewOut.Response.UID = admissionReviewReceived.Request.UID
+		admissionReviewResponse.Response = admissionResponse
+		if admissionReviewRequest != nil && admissionReviewRequest.Request != nil {
+			admissionReviewResponse.Response.UID = admissionReviewRequest.Request.UID
 		}
 	}
 
-	resp, err := json.Marshal(admissionReviewOut)
+	resp, err := json.Marshal(admissionReviewResponse)
 	if err != nil {
-		log.SetStepState(lc.Error).Errorf("can't encode response: %v", err)
-		http.Error(rWriter, fmt.Sprintf("could not encode response: %v", err), http.StatusInternalServerError)
+		handleError(httpWriter, fmt.Errorf("can't encode response: %v", err), http.StatusInternalServerError)
 	}
 
-	if _, err := rWriter.Write(resp); err != nil {
-		log.SetStepState(lc.Error).Errorf("can't write response: %v", err)
-		http.Error(rWriter, fmt.Sprintf("could not write response: %v", err), http.StatusInternalServerError)
+	if _, err := httpWriter.Write(resp); err != nil {
+		handleError(httpWriter, fmt.Errorf("can't write response: %v", err), http.StatusInternalServerError)
 	} else {
 		if admissionResponse != nil && admissionResponse.Allowed {
 			log.SetStepState(lc.Complete).Info("admission review completed successfully")
@@ -102,40 +91,46 @@ func (s Server) Serve(rWriter http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (s Server) mutate(pdt pdtv1.Product, operation, user string) *v1beta1.AdmissionResponse {
-	log.SetStep(lc.Mutate).SetStepState(lc.Start).Infof("mutate namespace=%s, name=%s", pdt.Namespace, pdt.Name)
+func (s Server) handle(reqPath string, req *v1beta1.AdmissionRequest) *v1beta1.AdmissionResponse {
+	var (
+		pdt        pdtv1.Product
+		patchBytes []byte
+		err        error
 
-	response := &v1beta1.AdmissionResponse{
-		Allowed: false,
-		Result:  &metav1.Status{},
+		response = &v1beta1.AdmissionResponse{Allowed: false, Result: &metav1.Status{}}
+	)
+
+	objBytes := req.Object.Raw
+	if strings.EqualFold(string(req.Operation), cfg.Delete) {
+		objBytes = req.OldObject.Raw
 	}
 
-	required, msg := cv.AdmissionRequired(ccfg.WhitelistNamespaces, pdtv1.ProductAnnotationWebhookMutateKey, &pdt.ObjectMeta)
-
-	if !required {
-		log.SetStepState(lc.Skip).Info(msg)
-
-		response.Allowed = true
+	if err = json.Unmarshal(objBytes, &pdt); err != nil {
+		response.Result.Message = fmt.Sprintf("can't unmarshal product object: %s", err.Error())
 	} else {
-		patchBytes, err := MutateProduct(pdt, operation, user)
+		log.SetObjectName(req.Name).SetOperation(strings.ToLower(string(req.Operation))).SetUser(
+			req.UserInfo.Username).Infof("admission review for namespace=%s, name=%s, user=%s, operation=%s",
+			req.Namespace, req.Name, req.UserInfo.Username, req.Operation)
 
-		if err != nil {
-			log.SetStepState(lc.Error).Error(err.Error())
+		log.LogAuditObject(pdt)
 
-			response.Result.Message = err.Error()
-		} else {
-			if patchBytes != nil {
-				log.Infof("patch resource : %s", string(patchBytes))
-
+		if reqPath == cfg.MutateURL {
+			patchBytes, err = s.mutate(pdt, string(req.Operation), req.UserInfo.Username)
+			if err == nil {
 				response.Patch = patchBytes
 				response.PatchType = func() *v1beta1.PatchType {
 					pt := v1beta1.PatchTypeJSONPatch
 					return &pt
 				}()
-			} else {
-				log.SetStepState(lc.Skip).Info("mutation not applicable")
 			}
+		} else if reqPath == cfg.ValidateURL {
+			err = s.validate(pdt, string(req.Operation), req.UserInfo.Username)
+		}
 
+		if err != nil {
+			log.SetStepState(lc.Error).Error(err.Error())
+			response.Result.Message = err.Error()
+		} else {
 			response.Allowed = true
 		}
 	}
@@ -143,34 +138,52 @@ func (s Server) mutate(pdt pdtv1.Product, operation, user string) *v1beta1.Admis
 	return response
 }
 
-func (s Server) validate(pdt pdtv1.Product, operation, user string) *v1beta1.AdmissionResponse {
-	log.SetStep(lc.Validate).SetStepState(lc.Start).Infof("validate namespace=%s, name=%s", pdt.Namespace, pdt.Name)
+func (s Server) mutate(pdt pdtv1.Product, operation, user string) ([]byte, error) {
+	var (
+		patchBytes []byte
+		err        error
+	)
 
-	response := &v1beta1.AdmissionResponse{
-		Allowed: false,
-		Result:  &metav1.Status{},
-	}
+	log.SetStep(lc.Mutate).SetStepState(lc.Start).Infof(
+		"========== mutate namespace=%s, name=%s, operation=%s ==========", pdt.Namespace, pdt.Name, operation)
 
-	required, msg := cv.AdmissionRequired(ccfg.WhitelistNamespaces, pdtv1.ProductAnnotationWebhookValidateKey, &pdt.ObjectMeta)
+	required, msg := cv.AdmissionRequired(pdtv1.ProductAnnotationWebhookMutateKey, &pdt.ObjectMeta)
 
 	if !required {
 		log.SetStepState(lc.Skip).Info(msg)
+	} else {
+		patchBytes, err = MutateProduct(pdt, operation, user)
 
-		response.Allowed = true
+		if err == nil {
+			if patchBytes != nil {
+				log.Debugf("patch resource : %s", string(patchBytes))
+			} else {
+				log.SetStepState(lc.Skip).Info("mutation not applicable")
+			}
+		}
+	}
+
+	return patchBytes, err
+}
+
+func (s Server) validate(pdt pdtv1.Product, operation, user string) error {
+	log.SetStep(lc.Validate).SetStepState(lc.Start).Infof(
+		"========== validate namespace=%s, name=%s, operation=%s ==========", pdt.Namespace, pdt.Name, operation)
+
+	required, msg := cv.AdmissionRequired(pdtv1.ProductAnnotationWebhookValidateKey, &pdt.ObjectMeta)
+
+	if !required {
+		log.SetStepState(lc.Skip).Info(msg)
 	} else {
 		err := validateProduct(pdt, operation, user)
 
 		if err != nil {
-			log.SetStepState(lc.Error).Error(err.Error())
-			response.Result.Message = err.Error()
-		} else {
-			// log audit object
-			log.SetObjectState(lc.Received).LogAuditObject(pdt)
-			response.Allowed = true
+			return err
 		}
+		log.SetObjectState(lc.Received).LogAuditObject(pdt)
 	}
 
-	return response
+	return nil
 }
 
 func decodeAdmissionReview(httpBody io.Reader) (*v1beta1.AdmissionReview, error) {
@@ -194,4 +207,9 @@ func decodeAdmissionReview(httpBody io.Reader) (*v1beta1.AdmissionReview, error)
 	}
 
 	return admissionReviewReceived, nil
+}
+
+func handleError(rWriter http.ResponseWriter, err error, errCode int) {
+	log.SetStepState(lc.Error).Errorf(err.Error())
+	http.Error(rWriter, fmt.Sprintf("error occurred: %v", err), errCode)
 }

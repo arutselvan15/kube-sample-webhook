@@ -7,5 +7,22 @@ app:
     components: all
   log:
     level: debug
+    format: text
+    file:
+      enabled: false
+      format: json
+      dir: /tmp
+      name: estore.log
+      # size in MB
+      size: 5
+      age: 5
+      backup: 3
+  system:
+    namespaces: kube, default
+    users: system:serviceaccount:kube
+  blacklist:
+    namespaces: virus
+    users: stranger
 cluster:
   name: minikube
+  kubeconfig: ~/.kube/config
