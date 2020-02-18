@@ -25,6 +25,9 @@ import (
 )
 
 var (
+	pdt               pdtv1.Product
+	admissionResponse *v1beta1.AdmissionResponse
+
 	log           = cLog.GetLogger()
 	runtimeScheme = runtime.NewScheme()
 	codecs        = serializer.NewCodecFactory(runtimeScheme)
@@ -38,11 +41,6 @@ type Server struct {
 
 // Serve serve
 func (s Server) Serve(rWriter http.ResponseWriter, req *http.Request) {
-	var (
-		pdt               pdtv1.Product
-		admissionResponse *v1beta1.AdmissionResponse
-	)
-
 	admissionReviewReceived, err := decodeAdmissionReview(req.Body)
 
 	if err != nil {
@@ -52,11 +50,16 @@ func (s Server) Serve(rWriter http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// unmarshal product
-	var arRequest = admissionReviewReceived.Request
+	arRequest := admissionReviewReceived.Request
 
-	if err = json.Unmarshal(arRequest.Object.Raw, &pdt); err != nil {
-		log.Errorf("can't unmarshal project object: %s", err.Error())
+	// during delete the object will be empty but you will have old object
+	objBytes := arRequest.Object.Raw
+	if strings.EqualFold(string(arRequest.Operation), cfg.Delete) {
+		objBytes = arRequest.OldObject.Raw
+	}
+
+	if err = json.Unmarshal(objBytes, &pdt); err != nil {
+		log.SetStepState(lc.Error).Errorf("can't unmarshal product object: %s", err.Error())
 
 		admissionResponse = &v1beta1.AdmissionResponse{Result: &metav1.Status{Message: err.Error()}}
 	} else {
@@ -66,7 +69,6 @@ func (s Server) Serve(rWriter http.ResponseWriter, req *http.Request) {
 
 		log.LogAuditObject(pdt)
 
-		// perform mutate/validate
 		if req.URL.Path == cfg.MutateURL {
 			admissionResponse = s.mutate(string(arRequest.Operation), pdt)
 		} else if req.URL.Path == cfg.ValidateURL {
@@ -74,7 +76,6 @@ func (s Server) Serve(rWriter http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// construct response
 	admissionReviewOut := v1beta1.AdmissionReview{}
 	if admissionResponse != nil {
 		admissionReviewOut.Response = admissionResponse
@@ -84,7 +85,6 @@ func (s Server) Serve(rWriter http.ResponseWriter, req *http.Request) {
 	}
 
 	resp, err := json.Marshal(admissionReviewOut)
-
 	if err != nil {
 		log.SetStepState(lc.Error).Errorf("can't encode response: %v", err)
 		http.Error(rWriter, fmt.Sprintf("could not encode response: %v", err), http.StatusInternalServerError)
@@ -93,9 +93,13 @@ func (s Server) Serve(rWriter http.ResponseWriter, req *http.Request) {
 	if _, err := rWriter.Write(resp); err != nil {
 		log.SetStepState(lc.Error).Errorf("can't write response: %v", err)
 		http.Error(rWriter, fmt.Sprintf("could not write response: %v", err), http.StatusInternalServerError)
+	} else {
+		if admissionResponse != nil && admissionResponse.Allowed {
+			log.SetStepState(lc.Complete).Info("admission review completed successfully")
+		} else {
+			log.SetStepState(lc.Error).Info("admission review failed")
+		}
 	}
-
-	log.SetStepState(lc.Complete).Info("admission review completed successfully")
 }
 
 func (s Server) mutate(operation string, pdt pdtv1.Product) *v1beta1.AdmissionResponse {
@@ -114,12 +118,15 @@ func (s Server) mutate(operation string, pdt pdtv1.Product) *v1beta1.AdmissionRe
 		response.Allowed = true
 	} else {
 		patchBytes, err := MutateProduct(operation, pdt)
+
 		if err != nil {
 			log.SetStepState(lc.Error).Error(err.Error())
 
 			response.Result.Message = err.Error()
 		} else {
 			if patchBytes != nil {
+				log.Infof("patch resource : %s", string(patchBytes))
+
 				response.Patch = patchBytes
 				response.PatchType = func() *v1beta1.PatchType {
 					pt := v1beta1.PatchTypeJSONPatch
