@@ -62,7 +62,7 @@ func (s Server) Serve(httpWriter http.ResponseWriter, httpReq *http.Request) {
 		} else if cv.CheckSystemUser(req.UserInfo.Username) || cv.CheckSystemNamespace(req.Namespace) {
 			admissionResponse.Allowed = true
 		} else {
-			admissionResponse = s.handle(httpReq.URL.String(), req)
+			admissionResponse = s.handle(httpReq.URL.Path, req)
 		}
 	} else {
 		admissionResponse.Result.Message = fmt.Sprintf("request is empty")
@@ -94,25 +94,26 @@ func (s Server) Serve(httpWriter http.ResponseWriter, httpReq *http.Request) {
 func (s Server) handle(reqPath string, req *v1beta1.AdmissionRequest) *v1beta1.AdmissionResponse {
 	var (
 		pdt        pdtv1.Product
+		oldPdt     pdtv1.Product
 		patchBytes []byte
 		err        error
 
 		response = &v1beta1.AdmissionResponse{Allowed: false, Result: &metav1.Status{}}
 	)
 
-	objBytes := req.Object.Raw
+	newObjBytes := req.Object.Raw
+	oldObjBytes := req.OldObject.Raw
+
 	if strings.EqualFold(string(req.Operation), cfg.Delete) {
-		objBytes = req.OldObject.Raw
+		newObjBytes = oldObjBytes
 	}
 
-	if err = json.Unmarshal(objBytes, &pdt); err != nil {
+	if err = json.Unmarshal(newObjBytes, &pdt); err != nil {
 		response.Result.Message = fmt.Sprintf("can't unmarshal product object: %s", err.Error())
 	} else {
 		log.SetObjectName(req.Name).SetOperation(strings.ToLower(string(req.Operation))).SetUser(
 			req.UserInfo.Username).Infof("admission review for namespace=%s, name=%s, user=%s, operation=%s",
 			req.Namespace, req.Name, req.UserInfo.Username, req.Operation)
-
-		log.LogAuditObject(pdt)
 
 		if reqPath == cfg.MutateURL {
 			patchBytes, err = s.mutate(pdt, string(req.Operation), req.UserInfo.Username)
@@ -124,7 +125,19 @@ func (s Server) handle(reqPath string, req *v1beta1.AdmissionRequest) *v1beta1.A
 				}()
 			}
 		} else if reqPath == cfg.ValidateURL {
+			if strings.EqualFold(string(req.Operation), cfg.Update) {
+				if err = json.Unmarshal(oldObjBytes, &oldPdt); err != nil {
+					log.LogAuditObject(pdt)
+				} else {
+					log.LogAuditObject(oldPdt, pdt)
+				}
+			} else {
+				log.LogAuditObject(pdt)
+			}
+
 			err = s.validate(pdt, string(req.Operation), req.UserInfo.Username)
+		} else {
+			err = fmt.Errorf("invalid request path %s", reqPath)
 		}
 
 		if err != nil {
