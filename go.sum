@@ -20,10 +20,10 @@ github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578/go.mod h1:uGdko
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
-github.com/arutselvan15/estore-common v1.0.8 h1:Ytzg7Ir0Fzey6l89poSjLxEzR4NezPMKveOwP2XU5nQ=
-github.com/arutselvan15/estore-common v1.0.8/go.mod h1:bSUfpdTfDwB4D+WvuQgLPvGKKfkp7IF4Ia39EyF4I3w=
-github.com/arutselvan15/estore-product-kube-client v1.0.3 h1:vJ7tum8AwjQEdsTKYPuAK86WOJzQa4Cw0D4bq3xu5QE=
-github.com/arutselvan15/estore-product-kube-client v1.0.3/go.mod h1:irBnoO+khCYLURZjP+meIkhsDSGQ3HuIAa+VNx1ibuU=
+github.com/arutselvan15/estore-common v1.0.9 h1:j6MZiHEkNVIMzZGnh/B6ycj/Tl/RgAAKrIEr2BgRidY=
+github.com/arutselvan15/estore-common v1.0.9/go.mod h1:CkgOBNwlFMzTJg7VQ98b7wJXRhTRXhRvE6q7KtDOmwA=
+github.com/arutselvan15/estore-product-kube-client v1.0.5 h1:Vwxqgo+2kaGo0l3IwvYuG1qqZRjDH4DJ8bGIdSZc2vc=
+github.com/arutselvan15/estore-product-kube-client v1.0.5/go.mod h1:irBnoO+khCYLURZjP+meIkhsDSGQ3HuIAa+VNx1ibuU=
 github.com/arutselvan15/go-utils v1.0.7 h1:SAL4owdSDyQ1ka2whyoe63n2lJovUHpqGlSqevzLLfo=
 github.com/arutselvan15/go-utils v1.0.7/go.mod h1:sbqZdkzHDmCRfVHxCsqbvs8BhbvvY626WssqdnbCzZQ=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=

@@ -1,8 +1,8 @@
 module github.com/arutselvan15/estore-product-kube-webhook
 
 require (
-	github.com/arutselvan15/estore-common v1.0.8
-	github.com/arutselvan15/estore-product-kube-client v1.0.3
+	github.com/arutselvan15/estore-common v1.0.9
+	github.com/arutselvan15/estore-product-kube-client v1.0.5
 	github.com/arutselvan15/go-utils v1.0.7
 	github.com/google/uuid v1.1.1
 	github.com/spf13/viper v1.6.2
